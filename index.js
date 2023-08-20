@@ -81,7 +81,15 @@ app
         fileUrls.push(image.path.replace(/\\/g, "/"));
       });
 
-      const { name, bedroomCount, price, description, category } = req.body;
+      const {
+        title,
+        bedroomCount,
+        perches,
+        price,
+        description,
+        category,
+        location,
+      } = req.body;
 
       const product = new Products({
         title,
@@ -96,6 +104,7 @@ app
       await product.save();
       return res.status(200).send(product);
     } catch (error) {
+      console.log(error);
       return res.status(500).send(error);
     }
   });
