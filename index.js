@@ -27,8 +27,10 @@ const subSchema = new mongoose.Schema({
   name: String,
 });
 const productSchema = new mongoose.Schema({
-  name: String,
+  title: String,
+  location: String,
   bedroomCount: Number,
+  perches: String,
   price: Number,
   description: String,
   category: String,
@@ -82,11 +84,13 @@ app
       const { name, bedroomCount, price, description, category } = req.body;
 
       const product = new Products({
-        name,
+        title,
         bedroomCount,
+        perches,
         price,
         description,
         category,
+        location,
         image: fileUrls,
       });
       await product.save();
