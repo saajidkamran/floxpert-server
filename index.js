@@ -8,6 +8,7 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const checkAuth = require("./middleware/auth-verify");
+const { Storage } = require('@google-cloud/storage');
 app.use(cors());
 app.use(express.static("./uploads")); // where images and all saved folder
 app.use(express.json());
@@ -17,9 +18,10 @@ app.use(
   })
 );
 app.use(bodyParser.json());
+const storages = new Storage();
 
 mongoose
-  .connect(process.env.MONGODB_CONNECTION, {
+  .connect("mongodb+srv://floxpert:12345@cluster0.uzivjif.mongodb.net/floxpert", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
