@@ -17,19 +17,18 @@ app.use(
     extended: false,
   })
 );
+const jsonKey = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 app.use(bodyParser.json());
-const gStorage = new Storage();
+const gStorage = new Storage({ credentials: JSON.parse(jsonKey) });
 
 mongoose
-  .connect(process.env.MONGODB_CONNECTION, {
+  .connect("mongodb://localhost:27017/floxpert", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.log(err));
-const subSchema = new mongoose.Schema({
-  name: String,
-});
+
 const productSchema = new mongoose.Schema({
   title: String,
   location: String,
