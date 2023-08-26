@@ -22,7 +22,7 @@ app.use(bodyParser.json());
 const gStorage = new Storage({ credentials: JSON.parse(jsonKey) });
 
 mongoose
-  .connect("mongodb://localhost:27017/floxpert", {
+  .connect(process.env.MONGODB_CONNECTION, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
@@ -34,7 +34,7 @@ const productSchema = new mongoose.Schema({
   location: String,
   bedroomCount: Number,
   perches: String,
-  price: Number,
+  price: String,
   description: String,
   category: String,
   image: [],
