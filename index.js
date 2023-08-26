@@ -8,7 +8,7 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const checkAuth = require("./middleware/auth-verify");
-const { Storage } = require('@google-cloud/storage');
+const { Storage } = require("@google-cloud/storage");
 app.use(cors());
 app.use(express.static("./uploads")); // where images and all saved folder
 app.use(express.json());
@@ -18,10 +18,10 @@ app.use(
   })
 );
 app.use(bodyParser.json());
-const storages = new Storage();
+const gStorage = new Storage();
 
 mongoose
-  .connect("mongodb+srv://floxpert:12345@cluster0.uzivjif.mongodb.net/floxpert", {
+  .connect(process.env.MONGODB_CONNECTION, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
@@ -92,11 +92,7 @@ app
   })
   .post(checkAuth, upload.array("image", 20), async (req, res, next) => {
     try {
-      const fileUrls = [];
-      req.files.map((image) => {
-        fileUrls.push(image.path.replace(/\\/g, "/"));
-      });
-
+      const files = req.files;
       const {
         title,
         bedroomCount,
@@ -106,7 +102,18 @@ app
         category,
         location,
       } = req.body;
-
+      const uploadedImages = [];
+      for (const file of files) {
+        const fileName = file.filename;
+        const localFilePath = file.path;
+        const [gcsFile] = await gStorage
+          .bucket("floxpert-backend")
+          .upload(localFilePath, {
+            destination: fileName,
+          });
+        const imageReference = gcsFile.metadata.mediaLink;
+        uploadedImages.push(imageReference);
+      }
       const product = new Products({
         title,
         bedroomCount,
@@ -115,7 +122,7 @@ app
         description,
         category,
         location,
-        image: fileUrls,
+        image: uploadedImages,
       });
       await product.save();
       return res.status(200).send(product);
@@ -144,7 +151,7 @@ app.post("/signup", async (req, res) => {
         error: "user exist",
       });
     } else {
-      bcrypt.hash(req.body.password, 10, (err, hash) => {
+      bcrypt.hash(req.body.password, 10, async (err, hash) => {
         if (err) {
           return res.status(500).json({
             error: err,
@@ -156,8 +163,7 @@ app.post("/signup", async (req, res) => {
               email: req.body.email,
               password: hash,
             });
-            user.save();
-            console.log("user>>", user);
+            await user.save();
             res.status(201).json({
               message: "user created",
             });
