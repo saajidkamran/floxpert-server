@@ -136,6 +136,26 @@ app.delete("/products/:id", checkAuth, async (req, res, next) => {
 
   try {
     const prod = await Products.findByIdAndDelete(id);
+    const findProds = await Products.findById(id);
+    const images = findProds.image;
+    const bucket = await gStorage.bucket("floxpert-backend");
+    for (const image of images) {
+      try {
+        const urlParts = image.split("?");
+        const pathParts = urlParts[0].split("/");
+        const objectName = decodeURIComponent(pathParts[pathParts.length - 1]);
+        const file = bucket.file(objectName);
+        const exists = await file.exists();
+
+        if (exists[0]) {
+          await file.delete();
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send(error);
+      }
+    }
+
     res.send(prod);
   } catch (error) {
     console.error(error);
