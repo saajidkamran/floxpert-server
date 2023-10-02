@@ -1,7 +1,4 @@
 require("dotenv").config();
-const { google } = require("googleapis");
-const fs = require("fs");
-s;
 const mongoose = require("mongoose");
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -133,15 +130,6 @@ app
       return res.status(500).send(error);
     }
   });
-// Load client secrets from a file you've downloaded from the Google Developers Console.
-const credentials = require("./googleauth/gcred.json");
-// Create an OAuth2 client
-const { client_secret, client_id, redirect_uris } = credentials.installed;
-const oAuth2Client = new google.auth.OAuth2(
-  client_id,
-  client_secret,
-  redirect_uris[0]
-);
 
 app.delete("/products/:id", checkAuth, async (req, res, next) => {
   const { id } = req.params;
