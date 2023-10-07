@@ -8,7 +8,6 @@ const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const checkAuth = require("./middleware/auth-verify");
-const { Storage } = require("@google-cloud/storage");
 app.use(cors());
 app.use(express.static("./uploads")); // where images and all saved folder
 app.use(express.json());
@@ -17,9 +16,7 @@ app.use(
     extended: false,
   })
 );
-const jsonKey = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 app.use(bodyParser.json());
-const gStorage = new Storage({ credentials: JSON.parse(jsonKey) });
 const admin = require("firebase-admin");
 const serviceAccount = require("./googleauth/firebasekey.json");
 
@@ -86,10 +83,9 @@ const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: fileFilter,
 });
+const bucket = admin.storage().bucket();
 
 async function uploadFiles(files) {
-  const bucket = admin.storage().bucket();
-
   if (!files || files.length === 0) {
     throw new Error("No files uploaded");
   }
@@ -129,6 +125,21 @@ async function uploadFiles(files) {
   );
 
   return urls;
+}
+async function deleteFiles(fileNames) {
+  const deletePromises = fileNames.map(async (fileName) => {
+    try {
+      const imageName = fileName.match(/\/([^/?]+)\?alt=media/); // Get the last part of the URL
+      const urlName = imageName[1];
+      console.log("image url", urlName);
+      await bucket.file(urlName).delete();
+      console.log(`File ${urlName} deleted successfully.`);
+    } catch (error) {
+      console.error(`Error deleting file ${fileName}:`, error);
+    }
+  });
+
+  await Promise.all(deletePromises);
 }
 
 app
@@ -172,32 +183,14 @@ app
     }
   });
 
-app.delete("/products/:id", checkAuth, async (req, res, next) => {
+app.delete("/products/:id", async (req, res, next) => {
   const { id } = req.params;
-
   try {
-    const prod = await Products.findByIdAndDelete(id);
     const findProds = await Products.findById(id);
+    const prod = await Products.findByIdAndDelete(id);
     const images = findProds.image;
-    const bucket = await gStorage.bucket("floxpert-backend");
-    for (const image of images) {
-      try {
-        const urlParts = image.split("?");
-        const pathParts = urlParts[0].split("/");
-        const objectName = decodeURIComponent(pathParts[pathParts.length - 1]);
-        const file = bucket.file(objectName);
-        const exists = await file.exists();
-
-        if (exists[0]) {
-          await file.delete();
-        }
-      } catch (error) {
-        console.error(error);
-        res.status(500).send(error);
-      }
-    }
-
-    res.send(prod);
+    await deleteFiles(images);
+    res.status(200).send({ message: "Files deleted successfully", prod });
   } catch (error) {
     console.error(error);
     res.status(500).send(error);
