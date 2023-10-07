@@ -20,6 +20,13 @@ app.use(
 const jsonKey = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 app.use(bodyParser.json());
 const gStorage = new Storage({ credentials: JSON.parse(jsonKey) });
+const admin = require("firebase-admin");
+const serviceAccount = require("./googleauth/firebasekey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: "gs://floxpert-c0e38.appspot.com",
+});
 
 mongoose
   .connect(process.env.MONGODB_CONNECTION, {
@@ -54,14 +61,14 @@ const userSchema = mongoose.Schema({
 const User = mongoose.model("User", userSchema);
 const Products = mongoose.model("Products", productSchema);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "./uploads");
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  },
-});
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, "./uploads");
+//   },
+//   filename: (req, file, cb) => {
+//     cb(null, file.originalname);
+//   },
+// });
 
 const fileFilter = (req, file, cb) => {
   if (
@@ -76,9 +83,54 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   fileFilter: fileFilter,
 });
+
+async function uploadFiles(files) {
+  const bucket = admin.storage().bucket();
+
+  if (!files || files.length === 0) {
+    throw new Error("No files uploaded");
+  }
+
+  const urls = [];
+
+  // Use Promise.all to upload all files in parallel
+  await Promise.all(
+    files.map(async (file) => {
+      const blob = bucket.file(file.originalname);
+
+      const blobStream = blob.createWriteStream({
+        metadata: {
+          contentType: file.mimetype,
+        },
+      });
+
+      await new Promise((resolve, reject) => {
+        blobStream.on("error", (err) => {
+          console.error(err);
+          reject("Error uploading file");
+        });
+
+        blobStream.on("finish", async () => {
+          // File uploaded successfully. Use the Firebase Storage object's URL.
+          const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${
+            bucket.name
+          }/o/${encodeURIComponent(blob.name)}?alt=media`;
+
+          urls.push(fileUrl);
+          resolve();
+        });
+
+        blobStream.end(file.buffer);
+      });
+    })
+  );
+
+  return urls;
+}
+
 app
   .route("/products")
   .get(async (req, res) => {
@@ -101,18 +153,7 @@ app
         category,
         location,
       } = req.body;
-      const uploadedImages = [];
-      for (const file of files) {
-        const fileName = file.filename;
-        const localFilePath = file.path;
-        const [gcsFile] = await gStorage
-          .bucket("floxpert-backend")
-          .upload(localFilePath, {
-            destination: fileName,
-          });
-        const imageReference = gcsFile.metadata.mediaLink;
-        uploadedImages.push(imageReference);
-      }
+      const uploadedImages = await uploadFiles(files);
       const product = new Products({
         title,
         bedroomCount,
